@@ -1,8 +1,12 @@
 import os
 import requests
+import logging
 from flask import Flask
 from threading import Thread
 from telegram.ext import Updater, CommandHandler
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
@@ -12,7 +16,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Altcoin Lightweight Bot Running!", 200
+    return "Altcoin Diagnostic Bot Running!", 200
 
 COIN_MAP = {
     "SUNDOG": "sundog", "AI16Z": "ai16z", "NEIRO": "neiro", "FET": "fetch-ai",
@@ -31,12 +35,19 @@ def get_coingecko_price(coin_id):
         "vs_currencies": "usd,krw",
         "include_24hr_change": "true"
     }
-    resp = requests.get(url, params=params)
-    if resp.status_code != 200:
+    try:
+        resp = requests.get(url, params=params, timeout=10)
+        if resp.status_code != 200:
+            logger.warning(f"API 실패 상태 코드: {resp.status_code}")
+            return None
+        logger.info(f"API 성공 응답: {resp.json()}")
+        return resp.json().get(coin_id)
+    except Exception as e:
+        logger.error(f"API 호출 예외: {e}")
         return None
-    return resp.json().get(coin_id)
 
 def price_handler(update, context):
+    logger.info(f"/price 명령어 수신: {context.args}")
     if len(context.args) != 1:
         update.message.reply_text("사용법: /price <코인명>")
         return
@@ -55,25 +66,17 @@ def price_handler(update, context):
     msg = f"💰 {coin} 가격\nUSD: ${usd:,}\nKRW: ₩{krw:,}\n24H: {change:.2f}%"
     update.message.reply_text(msg)
 
-def summary_handler(update, context):
-    url = "https://api.coingecko.com/api/v3/global"
-    resp = requests.get(url)
-    if resp.status_code != 200:
-        update.message.reply_text("❌ 데이터 조회 실패")
-        return
-    d = resp.json()["data"]
-    dom = d["market_cap_percentage"]["btc"]
-    cap = d["total_market_cap"]["usd"]
-    msg = f"🌐 Market Summary\nBTC Dominance: {dom:.2f}%\nTotal Cap: ${cap:,.0f}"
-    update.message.reply_text(msg)
+def start_handler(update, context):
+    logger.info("/start 명령어 수신")
+    update.message.reply_text("✅ Altcoin Diagnostic Bot Ready!")
 
 def start_bot():
+    logger.info("Bot polling 시작")
     updater = Updater(TOKEN, use_context=True, request_kwargs={"read_timeout": 10, "connect_timeout": 10})
     dp = updater.dispatcher
 
-    dp.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text("✅ Altcoin Lightweight Bot Ready!")))
+    dp.add_handler(CommandHandler("start", start_handler))
     dp.add_handler(CommandHandler("price", price_handler))
-    dp.add_handler(CommandHandler("summary", summary_handler))
 
     updater.start_polling(poll_interval=10)
     updater.idle()
