@@ -16,7 +16,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Altcoin Diagnostic Bot Running!", 200
+    return "Altcoin Raw Diagnostic Bot Running!", 200
 
 COIN_MAP = {
     "ADA": "cardano", "FET": "fetch-ai", "SUNDOG": "sundog"
@@ -42,6 +42,7 @@ def get_coingecko_price(coin_id):
 
 def price_handler(update, context):
     logger.info(f"/price 명령어 수신: {context.args}")
+    logger.info(f"getUpdates raw update: {update.to_dict()}")
     if len(context.args) != 1:
         update.message.reply_text("사용법: /price <코인명>")
         return
@@ -62,10 +63,8 @@ def price_handler(update, context):
 
 def start_handler(update, context):
     logger.info(f"/start 명령어 수신")
-    update.message.reply_text("✅ Altcoin Diagnostic Bot Ready!")
-
-def raw_update_logger(update):
-    logger.info(f"getUpdates 응답: {update.to_dict()}")
+    logger.info(f"getUpdates raw update: {update.to_dict()}")
+    update.message.reply_text("✅ Altcoin Raw Diagnostic Bot Ready!")
 
 def start_bot():
     logger.info("Bot polling 시작")
@@ -74,7 +73,6 @@ def start_bot():
 
     dp.add_handler(CommandHandler("start", start_handler))
     dp.add_handler(CommandHandler("price", price_handler))
-    dp.add_handler(CommandHandler(None, lambda u, c: raw_update_logger(u)))  # 모든 update 로깅
 
     updater.start_polling(poll_interval=10)
     updater.idle()
