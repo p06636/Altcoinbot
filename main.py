@@ -1,82 +1,30 @@
-import os
-import requests
-import logging
-from flask import Flask
-from threading import Thread
-from telegram.ext import Updater, CommandHandler
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, CallbackContext
+import os
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-if not TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN is not set.")
 
-app = Flask(__name__)
+def start(update: Update, context: CallbackContext):
+    update.message.reply_text("🚀 AltSeasonPulseBot이 시작되었습니다!")
 
-@app.route("/")
-def home():
-    return "Altcoin Raw Diagnostic Bot Running!", 200
-
-COIN_MAP = {
-    "ADA": "cardano", "FET": "fetch-ai", "SUNDOG": "sundog"
-}
-
-def get_coingecko_price(coin_id):
-    url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {
-        "ids": coin_id,
-        "vs_currencies": "usd,krw",
-        "include_24hr_change": "true"
-    }
-    try:
-        resp = requests.get(url, params=params, timeout=10)
-        if resp.status_code != 200:
-            logger.warning(f"API 실패 상태 코드: {resp.status_code}")
-            return None
-        logger.info(f"API 성공 응답: {resp.json()}")
-        return resp.json().get(coin_id)
-    except Exception as e:
-        logger.error(f"API 호출 예외: {e}")
-        return None
-
-def price_handler(update, context):
-    logger.info(f"/price 명령어 수신: {context.args}")
-    logger.info(f"getUpdates raw update: {update.to_dict()}")
-    if len(context.args) != 1:
-        update.message.reply_text("사용법: /price <코인명>")
+def price(update: Update, context: CallbackContext):
+    args = context.args
+    if not args:
+        update.message.reply_text("💡 사용법: /price [코인명]")
         return
-    coin = context.args[0].upper()
-    coin_id = COIN_MAP.get(coin)
-    if not coin_id:
-        update.message.reply_text("🚫 지원되지 않는 코인입니다.")
-        return
-    data = get_coingecko_price(coin_id)
-    if not data:
-        update.message.reply_text("❌ 데이터 조회 실패")
-        return
-    usd = data["usd"]
-    krw = data["krw"]
-    change = data["usd_24h_change"]
-    msg = f"💰 {coin} 가격\nUSD: ${usd:,}\nKRW: ₩{krw:,}\n24H: {change:.2f}%"
-    update.message.reply_text(msg)
+    coin = args[0].upper()
+    # 모의 데이터 응답
+    update.message.reply_text(f"📈 {coin} 현재 가격 (모의): 123.45 USD")
 
-def start_handler(update, context):
-    logger.info(f"/start 명령어 수신")
-    logger.info(f"getUpdates raw update: {update.to_dict()}")
-    update.message.reply_text("✅ Altcoin Raw Diagnostic Bot Ready!")
-
-def start_bot():
-    logger.info("Bot polling 시작")
-    updater = Updater(TOKEN, use_context=True, request_kwargs={"read_timeout": 10, "connect_timeout": 10})
+def main():
+    updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
-
-    dp.add_handler(CommandHandler("start", start_handler))
-    dp.add_handler(CommandHandler("price", price_handler))
-
-    updater.start_polling(poll_interval=10)
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("price", price))
+    updater.start_polling()
+    print("✅ Bot is polling...")
     updater.idle()
 
 if __name__ == "__main__":
-    Thread(target=start_bot).start()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    main()
