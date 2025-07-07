@@ -1,4 +1,5 @@
 
+import requests
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 import os
@@ -6,16 +7,25 @@ import os
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 def start(update: Update, context: CallbackContext):
-    update.message.reply_text("🚀 AltSeasonPulseBot이 시작되었습니다!")
+    update.message.reply_text("✅ Altcoin Diagnostic Bot Ready!\n사용법: /price <코인명>")
 
 def price(update: Update, context: CallbackContext):
-    args = context.args
-    if not args:
-        update.message.reply_text("💡 사용법: /price [코인명]")
+    if not context.args:
+        update.message.reply_text("사용법: /price <코인명>")
         return
-    coin = args[0].upper()
-    # 모의 데이터 응답
-    update.message.reply_text(f"📈 {coin} 현재 가격 (모의): 123.45 USD")
+    coin = context.args[0].lower()
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin}&vs_currencies=usd"
+    try:
+        resp = requests.get(url)
+        resp.raise_for_status()
+        data = resp.json()
+        if coin in data:
+            price = data[coin]["usd"]
+            update.message.reply_text(f"📈 {coin.upper()} 현재 가격: ${price}")
+        else:
+            update.message.reply_text(f"❌ {coin.upper()} 데이터 없음 (API 응답: {data})")
+    except Exception as e:
+        update.message.reply_text(f"❌ 데이터 조회 실패: {str(e)}")
 
 def main():
     updater = Updater(TOKEN, use_context=True)
